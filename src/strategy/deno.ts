@@ -23,6 +23,7 @@
 // External packages
 import { Errors } from 'release-please'
 import type { BuildUpdatesOptions } from 'release-please'
+import type { Version } from 'release-please/build/src/version.js'
 
 // External utilities
 import type { GitHubFileContents } from '@google-automations/git-file-utils'
@@ -42,6 +43,7 @@ import { SamplesPackageJson } from 'release-please/build/src/updaters/node/sampl
 
 // Release-please utilities
 import { filterCommits } from 'release-please/build/src/util/filter-commits.js'
+import type { ConventionalCommit } from 'release-please/build/src/commit.js'
 
 // Local types
 import type { DenoConfigFileName } from '../types.ts'
@@ -55,69 +57,104 @@ export class Deno extends BaseStrategy {
   private pkgJsonContents?: GitHubFileContents
   private pkgJsonName?: DenoConfigFileName
 
-  protected async buildUpdates(
-    options: BuildUpdatesOptions,
-  ): Promise<Update[]> {
-    const updates: Update[] = []
-    const version = options.newVersion
-    const versionsMap = options.versionsMap
-    const packageName: string = (await this.getPackageName()) ?? ''
+  /**
+   * Creates updates for lock files (package-lock.json, npm-shrinkwrap.json)
+   */
+  private createLockFileUpdates(version: Version, versionsMap: Map<string, Version>): Update[] {
+    return LOCK_FILES.map((lockFile: string): Update => ({
+      path: this.addPath(lockFile),
+      createIfMissing: false,
+      updater: new PackageLockJson({
+        version,
+        versionsMap,
+      }),
+    }))
+  }
 
-    LOCK_FILES.forEach((lockFile: string): void => {
-      updates.push({
-        path: this.addPath(lockFile),
-        createIfMissing: false,
-        updater: new PackageLockJson({
-          version,
-          versionsMap,
-        }),
-      })
-    })
-
-    updates.push({
+  /**
+   * Creates update for samples package.json
+   */
+  private createSampleUpdates(version: Version, packageName: string): Update[] {
+    return [{
       path: this.addPath('samples/package.json'),
       createIfMissing: false,
       updater: new SamplesPackageJson({
         version,
         packageName,
       }),
-    })
+    }]
+  }
 
-    !this.skipChangelog &&
-      updates.push({
-        path: this.addPath(this.changelogPath),
-        createIfMissing: true,
-        updater: new Changelog({
-          version,
-          changelogEntry: options.changelogEntry,
-        }),
-      })
-
-    updates.push({
+  /**
+   * Creates main package.json update
+   */
+  private createPackageUpdates(version: Version): Update[] {
+    return [{
       path: this.addPath('package.json'),
       createIfMissing: false,
       cachedFileContents: this.pkgJsonContents,
       updater: new PackageJson({
         version,
       }),
-    })
+    }]
+  }
 
-    // If a machine readable changelog.json exists update it:
-    if (options.commits && packageName && !this.skipChangelog) {
-      const commits = filterCommits(options.commits, this.changelogSections)
+  /**
+   * Creates changelog-related updates (markdown and JSON)
+   */
+  private createChangelogUpdates(
+    version: Version,
+    changelogEntry: string,
+    packageName: string,
+    commits?: ConventionalCommit[],
+  ): Update[] {
+    const updates: Update[] = []
+
+    if (!this.skipChangelog) {
+      // Add markdown changelog
       updates.push({
-        path: 'changelog.json',
-        createIfMissing: false,
-        updater: new ChangelogJson({
-          artifactName: packageName,
+        path: this.addPath(this.changelogPath),
+        createIfMissing: true,
+        updater: new Changelog({
           version,
-          commits,
-          language: ProgrammingLanguage.JAVASCRIPT,
+          changelogEntry,
         }),
       })
+
+      // Add JSON changelog if we have commits and package name
+      if (commits && packageName) {
+        const filteredCommits = filterCommits(commits, this.changelogSections)
+        updates.push({
+          path: 'changelog.json',
+          createIfMissing: false,
+          updater: new ChangelogJson({
+            artifactName: packageName,
+            version,
+            commits: filteredCommits,
+            language: ProgrammingLanguage.JAVASCRIPT,
+          }),
+        })
+      }
     }
 
     return updates
+  }
+
+  protected async buildUpdates(
+    options: BuildUpdatesOptions,
+  ): Promise<Update[]> {
+    const { newVersion: version, versionsMap, changelogEntry, commits } = options
+    const packageName: string = (await this.getPackageName()) ?? ''
+
+    // Collect all updates using helper methods
+    const allUpdates = [
+      ...this.createLockFileUpdates(version, versionsMap),
+      ...this.createSampleUpdates(version, packageName),
+      ...this.createPackageUpdates(version),
+      ...this.createChangelogUpdates(version, changelogEntry, packageName, commits),
+    ]
+
+    return allUpdates
   }
 
   override async getDefaultPackageName(): Promise<string | undefined> {
@@ -142,34 +179,41 @@ export class Deno extends BaseStrategy {
     return component.match(/^@[\w-]+\//) ? component.split('/')[1] : component
   }
 
-  protected async getPkgJsonContents(): Promise<GitHubFileContents> {
-    if (!this.pkgJsonContents) {
-      let found = false
-      for (const confFile of DENO_CONF_FILES) {
-        try {
-          this.pkgJsonContents = await this.github.getFileContentsOnBranch(
-            this.addPath(confFile),
-            this.targetBranch,
-          )
-          found = true
-          this.pkgJsonName = confFile
-          return this.pkgJsonContents
-        } catch (error: unknown) {
-          if (error instanceof Errors.FileNotFoundError) {
-            continue
-          }
-          throw error
-        }
-      }
-      if (!found) {
-        this.logger.error('No deno.json, deno.jsonc, or package.json found in the repository')
-        throw new Errors.MissingRequiredFileError(
-          this.addPath('deno.json'),
-          'node',
-          `${this.repository.owner}/${this.repository.repo}`,
+  /**
+   * Attempts to find and load the first available configuration file
+   */
+  private async findConfigFile(): Promise<{ contents: GitHubFileContents; fileName: DenoConfigFileName }> {
+    for (const configFile of DENO_CONF_FILES) {
+      try {
+        const contents = await this.github.getFileContentsOnBranch(
+          this.addPath(configFile),
+          this.targetBranch,
         )
+        return { contents, fileName: configFile }
+      } catch (error: unknown) {
+        if (error instanceof Errors.FileNotFoundError) {
+          continue // Try next file
+        }
+        // Re-throw non-FileNotFound errors immediately
+        throw error
       }
     }
-    return this.pkgJsonContents!
+
+    // No config file found
+    this.logger.error('No deno.json, deno.jsonc, or package.json found in the repository')
+    throw new Errors.MissingRequiredFileError(
+      this.addPath('deno.json'),
+      'node',
+      `${this.repository.owner}/${this.repository.repo}`,
+    )
+  }
+
+  protected async getPkgJsonContents(): Promise<GitHubFileContents> {
+    if (!this.pkgJsonContents) {
+      const { contents, fileName } = await this.findConfigFile()
+      this.pkgJsonContents = contents
+      this.pkgJsonName = fileName
+    }
+    return this.pkgJsonContents
   }
 }
