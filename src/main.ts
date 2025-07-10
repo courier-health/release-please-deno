@@ -38,11 +38,44 @@ import { SamplesPackageJson } from 'release-please/build/src/updaters/node/sampl
 // Release-please utilities
 import { filterCommits } from 'release-please/build/src/util/filter-commits.js'
 
-const DENO_CONF_FILES = ['deno.json', 'deno.jsonc', 'package.json']
+// Type definitions
+interface PackageJsonContent {
+  name?: string
+  version?: string
+  [key: string]: unknown
+}
+
+interface DenoPluginOptions {
+  skipChangelog?: boolean
+  changelogPath?: string
+  [key: string]: unknown
+}
+
+enum ProgrammingLanguage {
+  JAVASCRIPT = 'JAVASCRIPT',
+  TYPESCRIPT = 'TYPESCRIPT',
+}
+
+type DenoConfigFileName = 'deno.json' | 'deno.jsonc' | 'package.json'
+
+// Type guards
+function isPackageJsonContent(obj: unknown): obj is PackageJsonContent {
+  return typeof obj === 'object' && obj !== null
+}
+
+function assertPackageJsonContent(obj: unknown): asserts obj is PackageJsonContent {
+  if (!isPackageJsonContent(obj)) {
+    throw new Error('Invalid package.json content structure')
+  }
+}
+
+// Constants
+const DENO_CONF_FILES: readonly DenoConfigFileName[] = ['deno.json', 'deno.jsonc', 'package.json'] as const
+const LOCK_FILES: readonly string[] = ['package-lock.json', 'npm-shrinkwrap.json'] as const
 
 export class Deno extends BaseStrategy {
   private pkgJsonContents?: GitHubFileContents
-  private pkgJsonName?: string
+  private pkgJsonName?: DenoConfigFileName
 
   protected async buildUpdates(
     options: BuildUpdatesOptions,
@@ -50,9 +83,9 @@ export class Deno extends BaseStrategy {
     const updates: Update[] = []
     const version = options.newVersion
     const versionsMap = options.versionsMap
-    const packageName = (await this.getPackageName()) ?? ''
-    const lockFiles = ['package-lock.json', 'npm-shrinkwrap.json']
-    lockFiles.forEach((lockFile) => {
+    const packageName: string = (await this.getPackageName()) ?? ''
+
+    LOCK_FILES.forEach((lockFile: string): void => {
       updates.push({
         path: this.addPath(lockFile),
         createIfMissing: false,
@@ -101,7 +134,7 @@ export class Deno extends BaseStrategy {
           artifactName: packageName,
           version,
           commits,
-          language: 'JAVASCRIPT',
+          language: ProgrammingLanguage.JAVASCRIPT,
         }),
       })
     }
@@ -110,9 +143,18 @@ export class Deno extends BaseStrategy {
   }
 
   override async getDefaultPackageName(): Promise<string | undefined> {
-    const pkgJsonContents = await this.getPkgJsonContents()
-    const pkg = JSON.parse(pkgJsonContents.parsedContent)
-    return pkg.name
+    const pkgJsonContents: GitHubFileContents = await this.getPkgJsonContents()
+
+    try {
+      const parsedContent: unknown = JSON.parse(pkgJsonContents.parsedContent)
+      assertPackageJsonContent(parsedContent)
+      return parsedContent.name
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Failed to parse ${this.pkgJsonName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+      return undefined
+    }
   }
 
   protected override normalizeComponent(component: string | undefined): string {
@@ -134,11 +176,11 @@ export class Deno extends BaseStrategy {
           found = true
           this.pkgJsonName = confFile
           return this.pkgJsonContents
-        } catch (e) {
-          if (e instanceof Errors.FileNotFoundError) {
+        } catch (error: unknown) {
+          if (error instanceof Errors.FileNotFoundError) {
             continue
           }
-          throw e
+          throw error
         }
       }
       if (!found) {
@@ -159,7 +201,7 @@ export class CustomPlugin extends ManifestPlugin {
     github: GitHub,
     targetBranch: string,
     repositoryConfig: RepositoryConfig,
-    options: Record<string, unknown> = {},
+    options: DenoPluginOptions = {},
   ) {
     super(github, targetBranch, repositoryConfig)
 
