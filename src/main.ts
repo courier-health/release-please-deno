@@ -13,18 +13,29 @@
 // Note: This file was borrowed heavily from the release-please Node Strategy file at: https://github.com/googleapis/release-please/blob/d5f2ca8a2cf32701f1d87a85bbc37493b1db65c2/src/strategies/node.ts
 // That file is licensed under the Apache License, Version 2.0 (the "License") and therefore this file is also licensed under the Apache License, Version 2.0.
 
+// External packages
 import { Errors, type GitHub } from 'release-please'
-import { type RepositoryConfig } from 'release-please/build/src/manifest.js'
-import { ManifestPlugin } from 'release-please/build/src/plugin.js'
-import { type Update } from 'release-please/build/src/update.js'
-import { BuildUpdatesOptions } from 'release-please'
-import { GitHubFileContents } from '@google-automations/git-file-utils'
+import type { BuildUpdatesOptions } from 'release-please'
+
+// External utilities
+import type { GitHubFileContents } from '@google-automations/git-file-utils'
+
+// Release-please core
 import { BaseStrategy } from 'release-please/build/src/strategies/base.js'
+import { ManifestPlugin } from 'release-please/build/src/plugin.js'
+
+// Release-please types
+import type { RepositoryConfig } from 'release-please/build/src/manifest.js'
+import type { Update } from 'release-please/build/src/update.js'
+
+// Release-please updaters
+import { Changelog } from 'release-please/build/src/updaters/changelog.js'
+import { ChangelogJson } from 'release-please/build/src/updaters/changelog-json.js'
+import { PackageJson } from 'release-please/build/src/updaters/node/package-json.js'
 import { PackageLockJson } from 'release-please/build/src/updaters/node/package-lock-json.js'
 import { SamplesPackageJson } from 'release-please/build/src/updaters/node/samples-package-json.js'
-import { Changelog } from 'release-please/build/src/updaters/changelog.js'
-import { PackageJson } from 'release-please/build/src/updaters/node/package-json.js'
-import { ChangelogJson } from 'release-please/build/src/updaters/changelog-json.js'
+
+// Release-please utilities
 import { filterCommits } from 'release-please/build/src/util/filter-commits.js'
 
 const DENO_CONF_FILES = ['deno.json', 'deno.jsonc', 'package.json']

@@ -17,11 +17,11 @@
 
 import { type ConventionalCommit, parseConventionalCommits } from 'release-please/build/src/commit.js'
 import crypto from 'node:crypto'
-import { GitHubFileContents } from '@google-automations/git-file-utils'
+import type { GitHubFileContents } from '@google-automations/git-file-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Buffer } from 'node:buffer'
-import { type Update } from 'release-please/build/src/update.js'
+import type { Update } from 'release-please/build/src/update.js'
 import { expect } from 'jsr:@std/expect'
 
 const DEFAULT_FILE_MODE = '100644'
@@ -73,7 +73,7 @@ export function assertHasUpdate(
   expect(found, `update for ${path}`).toBeUndefined
   if (clazz) {
     expect(found?.updater).toBeInstanceOf(
-      clazz
+      clazz,
     )
   }
   return found!

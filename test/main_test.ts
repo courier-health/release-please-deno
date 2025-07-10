@@ -22,7 +22,6 @@ import { stub } from 'jsr:@std/testing/mock'
 import { assertSnapshot } from 'jsr:@std/testing/snapshot'
 
 import { assertHasUpdate, assertNoHasUpdate, buildGitHubFileContent, buildMockConventionalCommit } from './helpers.ts'
-
 import { GitHub } from 'release-please'
 import { Version } from 'release-please/build/src/version.js'
 import { TagName } from 'release-please/build/src/util/tag-name.js'
@@ -36,7 +35,7 @@ import { Errors } from 'release-please'
 const fixturesPath = './test/fixtures'
 
 const UUID_REGEX = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/g
-const ISO_DATE_REGEX = /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]+Z/g // 2023-01-05T16:42:33.446Z
+const ISO_DATE_REGEX = /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]+Z/g
 
 describe('Deno', () => {
   let github: GitHub
