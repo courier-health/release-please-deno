@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "exports": "./src/mod.ts",
   "tasks": {
-    "dev": "deno test --watch"
+    "dev": "deno test --watch",
+    "test": "deno test --allow-read --allow-env",
+    "pre-commit": "deno check && deno lint && deno task test && deno fmt --check"
   },
   "imports": {
     "@google-automations/git-file-utils": "npm:@google-automations/git-file-utils@^3.0.0",

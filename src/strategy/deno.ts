@@ -13,8 +13,15 @@
 // Note: This file was borrowed heavily from the release-please Node Strategy file at: https://github.com/googleapis/release-please/blob/d5f2ca8a2cf32701f1d87a85bbc37493b1db65c2/src/strategies/node.ts
 // That file is licensed under the Apache License, Version 2.0 (the "License") and therefore this file is also licensed under the Apache License, Version 2.0.
 
+/**
+ * Deno strategy for release-please.
+ *
+ * This module provides the Deno strategy class that handles version management
+ * for Deno projects supporting deno.json, deno.jsonc, and package.json files.
+ */
+
 // External packages
-import { Errors, type GitHub } from 'release-please'
+import { Errors } from 'release-please'
 import type { BuildUpdatesOptions } from 'release-please'
 
 // External utilities
@@ -22,10 +29,8 @@ import type { GitHubFileContents } from '@google-automations/git-file-utils'
 
 // Release-please core
 import { BaseStrategy } from 'release-please/build/src/strategies/base.js'
-import { ManifestPlugin } from 'release-please/build/src/plugin.js'
 
 // Release-please types
-import type { RepositoryConfig } from 'release-please/build/src/manifest.js'
 import type { Update } from 'release-please/build/src/update.js'
 
 // Release-please updaters
@@ -38,36 +43,9 @@ import { SamplesPackageJson } from 'release-please/build/src/updaters/node/sampl
 // Release-please utilities
 import { filterCommits } from 'release-please/build/src/util/filter-commits.js'
 
-// Type definitions
-interface PackageJsonContent {
-  name?: string
-  version?: string
-  [key: string]: unknown
-}
-
-interface DenoPluginOptions {
-  skipChangelog?: boolean
-  changelogPath?: string
-  [key: string]: unknown
-}
-
-enum ProgrammingLanguage {
-  JAVASCRIPT = 'JAVASCRIPT',
-  TYPESCRIPT = 'TYPESCRIPT',
-}
-
-type DenoConfigFileName = 'deno.json' | 'deno.jsonc' | 'package.json'
-
-// Type guards
-function isPackageJsonContent(obj: unknown): obj is PackageJsonContent {
-  return typeof obj === 'object' && obj !== null
-}
-
-function assertPackageJsonContent(obj: unknown): asserts obj is PackageJsonContent {
-  if (!isPackageJsonContent(obj)) {
-    throw new Error('Invalid package.json content structure')
-  }
-}
+// Local types
+import type { DenoConfigFileName } from '../types.ts'
+import { assertPackageJsonContent, ProgrammingLanguage } from '../types.ts'
 
 // Constants
 const DENO_CONF_FILES: readonly DenoConfigFileName[] = ['deno.json', 'deno.jsonc', 'package.json'] as const
@@ -194,22 +172,4 @@ export class Deno extends BaseStrategy {
     }
     return this.pkgJsonContents!
   }
-}
-
-export class CustomPlugin extends ManifestPlugin {
-  constructor(
-    github: GitHub,
-    targetBranch: string,
-    repositoryConfig: RepositoryConfig,
-    options: DenoPluginOptions = {},
-  ) {
-    super(github, targetBranch, repositoryConfig)
-
-    this.logger.info('Deno Release Plugin initialized with options: ', options)
-  }
-}
-
-// Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
-if (import.meta.main) {
-  // TODO: Add main function
 }

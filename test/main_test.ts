@@ -13,7 +13,7 @@
 // Note: This test file was borrowed heavily from the release-please Node Strategy test file that at: https://github.com/googleapis/release-please/blob/d5f2ca8a2cf32701f1d87a85bbc37493b1db65c2/test/strategies/node.ts
 // That file is licensed under the Apache License, Version 2.0 (the "License") and therefore this file is also licensed under the Apache License, Version 2.0.
 
-import { Deno } from '../src/main.ts'
+import { Deno } from '../src/strategy/deno.ts'
 
 import { beforeEach, describe, it } from 'jsr:@std/testing/bdd'
 import { expect } from 'jsr:@std/expect'
