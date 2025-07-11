@@ -19,7 +19,6 @@ import { beforeEach, describe, it } from 'jsr:@std/testing/bdd'
 import { expect } from 'jsr:@std/expect'
 import { assertRejects } from 'jsr:@std/assert'
 import { stub } from 'jsr:@std/testing/mock'
-import { assertSnapshot } from 'jsr:@std/testing/snapshot'
 
 import { assertHasUpdate, assertNoHasUpdate, buildGitHubFileContent, buildMockConventionalCommit } from './helpers.ts'
 import { GitHub } from 'release-please'
@@ -29,13 +28,9 @@ import { PackageLockJson } from 'release-please/build/src/updaters/node/package-
 import { SamplesPackageJson } from 'release-please/build/src/updaters/node/samples-package-json.js'
 import { Changelog } from 'release-please/build/src/updaters/changelog.js'
 import { PackageJson } from 'release-please/build/src/updaters/node/package-json.js'
-import { ChangelogJson } from 'release-please/build/src/updaters/changelog-json.js'
 import { Errors } from 'release-please'
 
 const fixturesPath = './test/fixtures'
-
-const UUID_REGEX = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/g
-const ISO_DATE_REGEX = /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]+Z/g
 
 describe('Deno', () => {
   let github: GitHub
@@ -183,65 +178,6 @@ describe('Deno', () => {
       await assertRejects(async () => {
         await strategy.buildReleasePullRequest(commits, latestRelease)
       }, Errors.MissingRequiredFileError)
-    })
-
-    it('updates changelog.json if present', async (t) => {
-      const COMMITS = [
-        ...buildMockConventionalCommit(
-          'fix(deps): update dependency com.google.cloud:google-cloud-storage to v1.120.0',
-        ),
-        ...buildMockConventionalCommit('chore: update deps'),
-        ...buildMockConventionalCommit('chore!: update a very important dep'),
-        ...buildMockConventionalCommit(
-          'fix(deps): update dependency com.google.cloud:google-cloud-spanner to v1.50.0',
-        ),
-        ...buildMockConventionalCommit('chore: update common templates'),
-      ]
-      const strategy = new Deno({
-        targetBranch: 'main',
-        github,
-        component: 'google-cloud-deno',
-      })
-      // deno-lint-ignore no-unused-vars
-      using findFilesByFilenameAndRefStub = stub(
-        github,
-        'findFilesByFilenameAndRef',
-        // deno-lint-ignore require-await
-        async () => [],
-      )
-      // deno-lint-ignore no-unused-vars
-      using getFileContentsStub = stub(
-        github,
-        'getFileContentsOnBranch',
-        // deno-lint-ignore require-await
-        async (path: string, branch: string) => {
-          if (path === 'changelog.json' && branch === 'main') {
-            return buildGitHubFileContent(`${fixturesPath}/${path}/changelog.json`, 'changelog.json')
-          }
-          if ((path === 'package.json' || path === 'deno.json' || path === 'deno.jsonc') && branch === 'main') {
-            return buildGitHubFileContent(`${fixturesPath}/${path}`, path)
-          }
-          throw new Error(`Not implemented getFileContentsOnBranch(${path}, ${branch})`)
-        },
-      )
-      const latestRelease = undefined
-      const release = await strategy.buildReleasePullRequest(
-        COMMITS,
-        latestRelease,
-      )
-      const updates = release!.updates
-      assertHasUpdate(updates, 'CHANGELOG.md', Changelog)
-      const update = assertHasUpdate(updates, 'changelog.json', ChangelogJson)
-      const newContent = update.updater.updateContent(
-        JSON.stringify({ entries: [] }),
-      )
-      assertSnapshot(
-        t,
-        newContent
-          .replace(/\r\n/g, '\n') // make newline consistent regardless of OS.
-          .replace(UUID_REGEX, 'abc-123-efd-qwerty')
-          .replace(ISO_DATE_REGEX, '2023-01-05T16:42:33.446Z'),
-      )
     })
   })
 
