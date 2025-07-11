@@ -142,3 +142,4 @@ dist
 dev-debug.log
 
 .docker/
+.direnv/
