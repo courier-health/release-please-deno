@@ -172,11 +172,91 @@ export class Deno extends BaseStrategy {
     }
   }
 
+  /**
+   * Normalizes a component name by extracting the package name from scoped packages.
+   *
+   * For scoped packages like "@org/package-name", returns "package-name".
+   * For regular packages like "package-name", returns "package-name".
+   *
+   * @param component - The component name to normalize
+   * @returns The normalized component name, or empty string if invalid
+   */
   protected override normalizeComponent(component: string | undefined): string {
-    if (!component) {
+    if (!component || typeof component !== 'string') {
       return ''
     }
-    return component.match(/^@[\w-]+\//) ? component.split('/')[1] : component
+
+    const trimmedComponent = component.trim()
+    if (!trimmedComponent) {
+      return ''
+    }
+
+    // Handle scoped packages (@scope/package-name)
+    if (this.isScopedPackage(trimmedComponent)) {
+      return this.extractPackageNameFromScoped(trimmedComponent)
+    }
+
+    // Handle regular packages (package-name)
+    return this.validateRegularPackageName(trimmedComponent)
+  }
+
+  /**
+   * Checks if a package name is a scoped package
+   */
+  private isScopedPackage(packageName: string): boolean {
+    return packageName.startsWith('@') && packageName.includes('/')
+  }
+
+  /**
+   * Extracts the package name from a scoped package
+   */
+  private extractPackageNameFromScoped(scopedPackage: string): string {
+    const parts = scopedPackage.split('/')
+
+    if (parts.length !== 2) {
+      this.logger.warn(`Invalid scoped package format: ${scopedPackage}`)
+      return ''
+    }
+
+    const [scope, packageName] = parts
+
+    // Validate scope format (@scope)
+    if (!scope.match(/^@[\w-]+$/)) {
+      this.logger.warn(`Invalid scope format in: ${scopedPackage}`)
+      return ''
+    }
+
+    // Validate package name
+    if (!packageName || !this.isValidPackageName(packageName)) {
+      this.logger.warn(`Invalid package name in scoped package: ${scopedPackage}`)
+      return ''
+    }
+
+    return packageName
+  }
+
+  /**
+   * Validates and returns a regular (non-scoped) package name
+   */
+  private validateRegularPackageName(packageName: string): string {
+    if (!this.isValidPackageName(packageName)) {
+      this.logger.warn(`Invalid package name format: ${packageName}`)
+      return ''
+    }
+    return packageName
+  }
+
+  /**
+   * Validates if a string is a valid package name according to npm rules
+   */
+  private isValidPackageName(name: string): boolean {
+    // Basic npm package name validation
+    // - Must be lowercase
+    // - Can contain letters, numbers, hyphens, underscores, and dots
+    // - Cannot start with dot or underscore
+    // - Must be between 1 and 214 characters
+    const validNamePattern = /^[a-z0-9][a-z0-9._-]*$/
+    return validNamePattern.test(name) && name.length <= 214
   }
 
   /**
