@@ -34,7 +34,7 @@
           config = { allowUnfree = true; };
         };
 
-        claude-code-version = "1.0.44";
+        claude-code-version = "1.0.119";
 
         claude-code-simple = pkgs.runCommand "claude-code" {
           buildInputs = [ pkgs.nodejs pkgs.cacert ];
