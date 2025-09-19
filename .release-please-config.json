@@ -1,0 +1,10 @@
+{
+  "plugins": ["@courier-health/release-please-deno"],
+  "packages": {
+    ".": {
+      "strategy": "deno",
+      "package-name": "@courier-health/release-please-deno",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}
